@@ -197,7 +197,7 @@ while [ $# -gt 0 ]; do
           echo "Requires a container number" 1>&2
           usage
         fi
-        if [ $2 -gt 10 ] || [ $2 -lt 3 ]; then
+        if [ $2 -gt 10 ] || [ $2 -lt 1 ]; then
           echo "NUM-INSTANCES should be between [3-10]" 1>&2
           usage
         fi
