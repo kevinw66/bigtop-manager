@@ -292,7 +292,7 @@ public class HostServiceImpl implements HostService {
             return;
         }
 
-        command = "bash -l -c \"./setup-agent.sh " + path + " " + repoUrl + " " + grpcPort + "\"";
+        command = "./setup-agent.sh " + path + " " + repoUrl + " " + grpcPort;
         ShellResult result = execCommandOnRemoteHost(hostDTO, hostname, command);
         if (result.getExitCode() != MessageConstants.SUCCESS_CODE) {
             log.error("Unable to setup agent, hostname: {}, msg: {}", hostname, result);
