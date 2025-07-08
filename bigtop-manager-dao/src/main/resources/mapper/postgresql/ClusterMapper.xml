@@ -40,7 +40,6 @@
         from
         cluster c left join "user" u on c.create_by = u.id
         left join host h on c.id = h.cluster_id
-        left join service s on c.id = s.cluster_id
         where c.id = #{id}
         group by c.id, u.nickname
         limit 1
