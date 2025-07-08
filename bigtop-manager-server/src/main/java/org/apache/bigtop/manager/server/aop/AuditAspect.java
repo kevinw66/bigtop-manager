@@ -82,7 +82,9 @@ public class AuditAspect {
             auditLogPO.setTagDesc(apiDesc);
             auditLogPO.setOperationSummary(operationSummary);
             auditLogPO.setOperationDesc(operationDesc);
-            auditLogPO.setArgs(JsonUtils.writeAsString(joinPoint.getArgs()));
+
+            // Temporary disable since params of command api sometimes are too long
+            // auditLogPO.setArgs(JsonUtils.writeAsString(joinPoint.getArgs()));
 
             log.debug("auditLog: {}", auditLogPO);
             log.debug("request method：{}.{}", joinPoint.getSignature().getDeclaringTypeName(), methodName);
