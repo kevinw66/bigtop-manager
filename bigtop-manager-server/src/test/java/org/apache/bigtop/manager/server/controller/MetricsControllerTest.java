@@ -18,6 +18,8 @@
  */
 package org.apache.bigtop.manager.server.controller;
 
+import org.apache.bigtop.manager.server.model.vo.ClusterMetricsVO;
+import org.apache.bigtop.manager.server.model.vo.HostMetricsVO;
 import org.apache.bigtop.manager.server.service.MetricsService;
 import org.apache.bigtop.manager.server.utils.MessageSourceUtils;
 import org.apache.bigtop.manager.server.utils.ResponseEntity;
@@ -64,23 +66,36 @@ class MetricsControllerTest {
     }
 
     @Test
-    void agentHostsHealthyStatusReturnsSuccess() {
-        JsonNode mockResponse = new ObjectMapper().createObjectNode();
-        when(metricsService.queryAgentsHealthyStatus()).thenReturn(mockResponse);
+    void testQueryAgentInfo() {
+        Long hostId = 1L;
+        String interval = "1m";
+        HostMetricsVO mockResponse = new HostMetricsVO();
+        mockResponse.setCpuUsageCur("50%");
+        mockResponse.setMemoryUsageCur("70%");
 
-        ResponseEntity<JsonNode> response = metricsController.agentHostsHealthyStatus();
+        when(metricsService.queryAgentsInfo(hostId, interval)).thenReturn(mockResponse);
 
+        ResponseEntity<HostMetricsVO> response = metricsController.queryAgentInfo(interval, hostId);
+
+        assertEquals("Mocked message", response.getMessage());
         assertTrue(response.isSuccess());
         assertEquals(mockResponse, response.getData());
     }
 
     @Test
-    void agentHostsHealthyStatusReturnsEmptyResponse() {
-        when(metricsService.queryAgentsHealthyStatus()).thenReturn(null);
+    void testQueryClusterInfo() {
+        Long clusterId = 1L;
+        String interval = "1m";
+        ClusterMetricsVO mockResponse = new ClusterMetricsVO();
+        mockResponse.setCpuUsageCur("60%");
+        mockResponse.setMemoryUsageCur("80%");
 
-        ResponseEntity<JsonNode> response = metricsController.agentHostsHealthyStatus();
+        when(metricsService.queryClustersInfo(clusterId, interval)).thenReturn(mockResponse);
 
+        ResponseEntity<ClusterMetricsVO> response = metricsController.queryCluster(interval, clusterId);
+
+        assertEquals("Mocked message", response.getMessage());
         assertTrue(response.isSuccess());
-        assertNull(response.getData());
+        assertEquals(mockResponse, response.getData());
     }
 }

@@ -274,10 +274,7 @@ public class HostServiceImpl implements HostService {
         try {
             String script = ProjectPathUtils.getServerScriptPath() + File.separator + "setup-agent.sh";
             String content = Files.readString(Path.of(script));
-            command = "cat << 'EOF' > ./setup-agent.sh\n"
-                    + content
-                    + "\nEOF\n"
-                    + "chmod +x ./setup-agent.sh";
+            command = "cat << 'EOF' > ./setup-agent.sh\n" + content + "\nEOF\n" + "chmod +x ./setup-agent.sh";
             ShellResult result = execCommandOnRemoteHost(hostDTO, hostname, command);
             if (result.getExitCode() != MessageConstants.SUCCESS_CODE) {
                 log.error("Unable to write agent script, hostname: {}, msg: {}", hostname, result);
