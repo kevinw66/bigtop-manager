@@ -22,6 +22,7 @@ import org.apache.bigtop.manager.server.model.vo.ClusterMetricsVO;
 import org.apache.bigtop.manager.server.model.vo.HostMetricsVO;
 
 import org.springframework.http.MediaType;
+import org.springframework.util.CollectionUtils;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -100,17 +101,26 @@ public class PrometheusProxy {
             Map<String, BigDecimal> agentDisk = retrieveAgentDisk(agentIpv4);
             Map<String, BigDecimal> agentDiskIO = retrieveAgentDiskIO(agentIpv4);
 
-            res.setCpuUsageCur(agentCpu.get(CPU_USAGE).toString());
+            // Use physical cores to check if the metrics is starting collect
+            if (!agentCpu.containsKey(PHYSICAL_CORES)) {
+                return res;
+            }
+
+            res.setCpuUsageCur(
+                    agentCpu.get(CPU_USAGE).multiply(new BigDecimal("100")).toString());
             res.setMemoryUsageCur((agentMem.get(MEM_TOTAL).subtract(agentMem.get(MEM_IDLE)))
                     .divide(agentMem.get(MEM_TOTAL), 4, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"))
                     .toString());
             res.setDiskUsageCur(agentDisk
                     .get(DISK_TOTAL)
                     .subtract(agentDisk.get(DISK_IDLE))
                     .divide(agentDisk.get(DISK_TOTAL), 4, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"))
                     .toString());
             res.setFileDescriptorUsage(agentCpu.get(FILE_OPEN_DESCRIPTOR)
                     .divide(agentCpu.get(FILE_TOTAL_DESCRIPTOR), 4, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"))
                     .toString());
             res.setDiskReadCur(agentDiskIO.get(DISK_READ).toString());
             res.setDiskWriteCur(agentDiskIO.get(DISK_WRITE).toString());
@@ -122,11 +132,11 @@ public class PrometheusProxy {
             Map<String, Map<String, BigDecimal>> agentDiskIOInterval =
                     retrieveAgentDiskIO(agentIpv4, interval, timestamps);
 
-            res.setCpuUsage(extractMap(agentCpuInterval.get(CPU_USAGE)));
+            res.setCpuUsage(extractMap(agentCpuInterval.get(CPU_USAGE), 100));
             res.setSystemLoad1(extractMap(agentCpuInterval.get(CPU_LOAD_AVG_MIN_1)));
             res.setSystemLoad5(extractMap(agentCpuInterval.get(CPU_LOAD_AVG_MIN_5)));
             res.setSystemLoad15(extractMap(agentCpuInterval.get(CPU_LOAD_AVG_MIN_15)));
-            res.setMemoryUsage(extractMap(agentMemInterval.get("memUsage")));
+            res.setMemoryUsage(extractMap(agentMemInterval.get("memUsage"), 100));
             res.setDiskRead(extractMap(agentDiskIOInterval.get(DISK_READ)));
             res.setDiskWrite(extractMap(agentDiskIOInterval.get(DISK_WRITE)));
         }
@@ -152,6 +162,11 @@ public class PrometheusProxy {
                 // Instant Metrics
                 Map<String, BigDecimal> agentCpu = retrieveAgentCpu(agentIpv4);
                 Map<String, BigDecimal> agentMem = retrieveAgentMemory(agentIpv4);
+
+                // Use physical cores to check if the metrics is starting collect
+                if (!agentCpu.containsKey(PHYSICAL_CORES)) {
+                    return res;
+                }
 
                 BigDecimal cpuUsage = agentCpu.get(CPU_USAGE);
                 BigDecimal physicalCores = agentCpu.get(PHYSICAL_CORES);
@@ -185,10 +200,12 @@ public class PrometheusProxy {
             // Instant Metrics
             res.setCpuUsageCur(usedPhysicalCores
                     .divide(totalPhysicalCores, 4, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"))
                     .toString());
             res.setMemoryUsageCur(totalMemSpace
                     .subtract(totalMemIdle)
                     .divide(totalMemSpace, 4, RoundingMode.HALF_UP)
+                    .multiply(new BigDecimal("100"))
                     .toString());
 
             // Range Metrics
@@ -199,14 +216,16 @@ public class PrometheusProxy {
                 String timestamp = entry.getKey();
                 BigDecimal usedCores = entry.getValue();
                 BigDecimal cpuUsage = usedCores.divide(totalPhysicalCores, 4, RoundingMode.HALF_UP);
-                cpuUsageMap.put(timestamp, cpuUsage.toString());
+                cpuUsageMap.put(
+                        timestamp, cpuUsage.multiply(new BigDecimal("100")).toString());
             }
 
             for (Map.Entry<String, BigDecimal> entry : timeMemIdle.entrySet()) {
                 String timestamp = entry.getKey();
                 BigDecimal memIdle = entry.getValue();
                 BigDecimal memUsage = totalMemSpace.subtract(memIdle).divide(totalMemSpace, 4, RoundingMode.HALF_UP);
-                memUsageMap.put(timestamp, memUsage.toString());
+                memUsageMap.put(
+                        timestamp, memUsage.multiply(new BigDecimal("100")).toString());
             }
 
             res.setCpuUsage(cpuUsageMap);
@@ -226,10 +245,12 @@ public class PrometheusProxy {
         }
 
         // Get common metrics
-        Map<String, String> metric = response.getData().getResult().get(0).getMetric();
-        map.put(PHYSICAL_CORES, new BigDecimal(metric.get(PHYSICAL_CORES)));
-        map.put(FILE_OPEN_DESCRIPTOR, new BigDecimal(metric.get(FILE_OPEN_DESCRIPTOR)));
-        map.put(FILE_TOTAL_DESCRIPTOR, new BigDecimal(metric.get(FILE_TOTAL_DESCRIPTOR)));
+        if (!CollectionUtils.isEmpty(response.getData().getResult())) {
+            Map<String, String> metric = response.getData().getResult().get(0).getMetric();
+            map.put(PHYSICAL_CORES, new BigDecimal(metric.get(PHYSICAL_CORES)));
+            map.put(FILE_OPEN_DESCRIPTOR, new BigDecimal(metric.get(FILE_OPEN_DESCRIPTOR)));
+            map.put(FILE_TOTAL_DESCRIPTOR, new BigDecimal(metric.get(FILE_TOTAL_DESCRIPTOR)));
+        }
 
         return map;
     }
@@ -287,7 +308,7 @@ public class PrometheusProxy {
 
         Map<String, BigDecimal> memTotalMap = map.get(MEM_TOTAL);
         Map<String, BigDecimal> memIdleMap = map.get(MEM_IDLE);
-        Map<String, BigDecimal> memUsageMap = map.get(MEM_IDLE);
+        Map<String, BigDecimal> memUsageMap = new HashMap<>();
 
         for (Map.Entry<String, BigDecimal> entry : memTotalMap.entrySet()) {
             String timestamp = entry.getKey();
@@ -380,9 +401,15 @@ public class PrometheusProxy {
     }
 
     private Map<String, String> extractMap(Map<String, BigDecimal> map) {
+        return extractMap(map, 1);
+    }
+
+    private Map<String, String> extractMap(Map<String, BigDecimal> map, Integer multiply) {
         Map<String, String> resultMap = new HashMap<>();
         for (Map.Entry<String, BigDecimal> entry : map.entrySet()) {
-            resultMap.put(entry.getKey(), entry.getValue().toString());
+            resultMap.put(
+                    entry.getKey(),
+                    entry.getValue().multiply(new BigDecimal(multiply)).toString());
         }
         return resultMap;
     }
@@ -418,7 +445,7 @@ public class PrometheusProxy {
     }
 
     public static void main(String[] args) {
-        String ipv4addr = "172.18.0.3";
+        String ipv4addr = "172.18.0.4";
         String interval = "1m";
         PrometheusProxy proxy = new PrometheusProxy("localhost", 19090);
 
